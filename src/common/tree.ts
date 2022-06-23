@@ -67,19 +67,26 @@ function findParents<T extends Obj>(
   return parents;
 }
 
-export function arrayToTree(array) {
-  const tree = [];
+export function arrayToTree<U, T extends U & { children: T[] }>(
+  array: U[],
+  idKey: keyof U,
+  parentIdKey: keyof U,
+): T[] {
+  if (!Array.isArray(array)) {
+    return [];
+  }
+
+  let tree: T[] = [];
   const map = new Map();
 
   array.forEach((item) => {
-    item.children = [];
-    map.set(item.id, item)
+    (item as T).children = [];
+    map.set(item[idKey], item);
   });
 
-  map.forEach((value, key) => {
-    const parent = map.get(value.id);
-    if (parent) {
-      parent.children.push(value);
+  map.forEach((value) => {
+    if (map.get(value[parentIdKey])) {
+      map.get(value[parentIdKey]).children.push(value);
     } else {
       tree.push(value);
     }
