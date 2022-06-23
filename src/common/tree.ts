@@ -66,3 +66,25 @@ function findParents<T extends Obj>(
   findParent(childId);
   return parents;
 }
+
+export function arrayToTree(array) {
+  const tree = [];
+  const map = new Map();
+
+  array.forEach((item) => {
+    item.children = [];
+    map.set(item.id, item)
+  });
+
+  map.forEach((value, key) => {
+    const parent = map.get(value.id);
+    if (parent) {
+      parent.children.push(value);
+    } else {
+      tree.push(value);
+    }
+  });
+
+  map.clear();
+  return tree;
+}
