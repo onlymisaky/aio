@@ -70,28 +70,73 @@ function findParents<T extends Obj>(
 export function arrayToTree<U, T extends U & { children: T[] }>(
   array: U[],
   idKey: keyof U,
-  parentIdKey: keyof U,
+  pIdKey: keyof U,
 ): T[] {
   if (!Array.isArray(array)) {
     return [];
   }
 
   let tree: T[] = [];
-  const map = new Map();
+  const map = new Map<string, T>();
 
   array.forEach((item) => {
-    (item as T).children = [];
-    map.set(item[idKey], item);
+    const id = item[idKey] as string;
+    const value = Object.assign({}, { ...item }, { children: [] },) as unknown as T;
+    map.set(id, value);
   });
 
   map.forEach((value) => {
-    if (map.get(value[parentIdKey])) {
-      map.get(value[parentIdKey]).children.push(value);
+    const parnetId = value[pIdKey] as string;
+    const parent = map.get(parnetId);
+    if (parent) {
+      parent.children.push(value);
     } else {
       tree.push(value);
     }
   });
 
   map.clear();
+  return tree;
+}
+
+export function arr2Tree<U, T extends U & { children: T[] }>(
+  arr: U[],
+  idKey: keyof U,
+  pIdKey: keyof U,
+  pId?: string | number,
+): T[] {
+  if (!Array.isArray(arr)) {
+    return [];
+  }
+
+  let tree: T[] = [];
+
+  if (arguments.length < 4) {
+    const ids = arr.map((item) => item[idKey]);
+
+    for (const item of arr) {
+      const { [pIdKey]: parnetId, [idKey]: id, } = item;
+      if (!ids.includes(parnetId)) {
+        const child = {
+          ...item,
+          children: arr2Tree(arr, idKey, pIdKey, id as string),
+        } as T;
+        tree.push(child);
+      }
+    }
+
+  } else {
+    for (let index = 0; index < arr.length; index++) {
+      const { [pIdKey]: parnetId, [idKey]: id, } = arr[index];
+      if (pId === parnetId) {
+        const child = {
+          ...arr[index],
+          children: arr2Tree(arr, idKey, pIdKey, id as string),
+        } as T;
+        tree.push(child);
+      }
+    }
+  }
+
   return tree;
 }
