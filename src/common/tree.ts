@@ -67,6 +67,21 @@ function findParents<T extends Obj>(
   return parents;
 }
 
+function findPath(code, list) {
+  for (const { children, ...item } of list) {
+    if (item.code === code) {
+      return [item]
+    }
+    if (children && children.length) {
+      const path = findPath(code, children)
+      if (path) {
+        path.unshift(item)
+        return path
+      }
+    }
+  }
+}
+
 export function arrayToTree<U, T extends U & { children: T[] }>(
   array: U[],
   idKey: keyof U,
