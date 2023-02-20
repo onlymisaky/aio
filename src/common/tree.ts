@@ -126,7 +126,7 @@ export function arr2Tree<U, T extends U & { children: T[] }>(
 
   let tree: T[] = [];
 
-  if (arguments.length < 4) {
+  if (pId === undefined) {
     const ids = arr.map((item) => item[idKey]);
 
     for (const item of arr) {
