@@ -41,6 +41,30 @@ function flatTree<T extends Obj>(tree: T[], options?: Partial<Opt<T>>): T[] {
   return list;
 }
 
+/**
+ * 支持自定义 pIdKey 和 cKey
+ * @param tree 
+ * @param idKey 
+ * @param pId 
+ * @returns 
+ */
+export function tree2Arr<T extends { children: T[] }, R = { pId: string } & Omit<T, 'children'>>(
+  tree: T[],
+  idKey: keyof T,
+  pId: string | number | undefined
+): R[] {
+  const array: R[] = [];
+
+  tree.forEach(({ children = [], [idKey]: id, ...node }) => {
+    const item = { [idKey]: id, ...node, pId, } as R;
+    array.push(item);
+    const list: R[] = tree2Arr(children, idKey, id as string | number | undefined);
+    array.push(...list);
+  });
+
+  return array;
+}
+
 function findParents<T extends Obj>(
   list: T[],
   childId: string | number,
