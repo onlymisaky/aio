@@ -126,32 +126,51 @@ export function arr2Tree<U, T extends U & { children: T[] }>(
 
   let tree: T[] = [];
 
-  if (pId === undefined) {
+  if (['null', 'undefined', ''].includes(`${pId}`.trim())) {
     const ids = arr.map((item) => item[idKey]);
-
-    for (const item of arr) {
-      const { [pIdKey]: parnetId, [idKey]: id, } = item;
-      if (!ids.includes(parnetId)) {
-        const child = {
-          ...item,
-          children: arr2Tree(arr, idKey, pIdKey, id as string),
-        } as T;
-        tree.push(child);
+    arr.forEach(({ [pIdKey]: parentId, [idKey]: id, ...item }) => {
+      if (!ids.includes(parentId)) {
+        const children = arr2Tree(arr, idKey, pIdKey, id as number | string);
+        tree.push({ [pIdKey]: parentId, [idKey]: id, ...item, children } as T);
       }
-    }
-
+    });
   } else {
-    for (let index = 0; index < arr.length; index++) {
-      const { [pIdKey]: parnetId, [idKey]: id, } = arr[index];
-      if (pId === parnetId) {
-        const child = {
-          ...arr[index],
-          children: arr2Tree(arr, idKey, pIdKey, id as string),
-        } as T;
-        tree.push(child);
+    arr.forEach(({ [pIdKey]: parentId, [idKey]: id, ...item }) => {
+      if (pId === parentId) {
+        const children = arr2Tree(arr, idKey, pIdKey, id as number | string);
+        tree.push({ [pIdKey]: parentId, [idKey]: id, ...item, children } as T);
       }
-    }
+    });
   }
+
+  return tree;
+}
+
+export function arr2Tree2<U, T extends U & { children: T[] }>(
+  arr: U[],
+  idKey: keyof U,
+  pIdKey: keyof U,
+): T[] {
+  if (!Array.isArray(arr)) {
+    return [];
+  }
+
+  let tree: T[] = [];
+
+  arr.forEach((item) => {
+    if (!item.children) {
+      item.children = [];
+    }
+    const parent = arr.find((item2) => item2[idKey] === item[pIdKey]);
+    if (!parent) {
+      tree.push({ ...item } as unknown as T);
+    } else {
+      if (!parent.children) {
+        parent.children = [];
+      }
+      parent.children.push({ ...item });
+    }
+  });
 
   return tree;
 }
