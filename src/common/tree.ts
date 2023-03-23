@@ -67,22 +67,40 @@ function findParents<T extends Obj>(
   return parents;
 }
 
-function findPath(code, list) {
-  for (const { children, ...item } of list) {
-    if (item.code === code) {
-      return [item]
+// T extends { children: T[] }
+function findPath<T>(
+  list: T[],
+  id: string | number,
+  idKey: keyof T,
+  childrenKey: keyof T,
+): T[] {
+  let path: T[] = [];
+
+  for (const item of list) {
+    if (item[idKey] === id) {
+      return [item];
     }
+    const children = item[childrenKey] as T[];
     if (children && children.length) {
-      const path = findPath(code, children)
-      if (path) {
-        path.unshift(item)
-        return path
+      path = findPath(children, id, idKey, childrenKey);
+      if (path && path.length) {
+        path.unshift(item);
+        return path;
       }
     }
   }
+
+  return path;
 }
 
-export function arrayToTree<U, T extends U & { children: T[] }>(
+/**
+ * Map
+ * @param array 
+ * @param idKey 
+ * @param pIdKey 
+ * @returns 
+ */
+function arr2TreeMap<U, T extends U & { children: T[] }>(
   array: U[],
   idKey: keyof U,
   pIdKey: keyof U,
@@ -91,12 +109,12 @@ export function arrayToTree<U, T extends U & { children: T[] }>(
     return [];
   }
 
-  let tree: T[] = [];
+  const tree: T[] = [];
   const map = new Map<string, T>();
 
   array.forEach((item) => {
     const id = item[idKey] as string;
-    const value = Object.assign({}, { ...item }, { children: [] },) as unknown as T;
+    const value = Object.assign({}, { ...item }, { children: [] }) as unknown as T;
     map.set(id, value);
   });
 
@@ -114,30 +132,40 @@ export function arrayToTree<U, T extends U & { children: T[] }>(
   return tree;
 }
 
-export function arr2Tree<U, T extends U & { children: T[] }>(
-  arr: U[],
+/**
+ * 递归
+ * @param arr 
+ * @param idKey 
+ * @param pIdKey 
+ * @param pId 
+ * @returns 
+ */
+function arr2TreeRecursion<U, T extends U & { children: T[] }>(
+  array: U[],
   idKey: keyof U,
   pIdKey: keyof U,
   pId?: string | number,
 ): T[] {
-  if (!Array.isArray(arr)) {
+  if (!Array.isArray(array)) {
     return [];
   }
 
-  let tree: T[] = [];
+  const tree: T[] = [];
 
   if (['null', 'undefined', ''].includes(`${pId}`.trim())) {
-    const ids = arr.map((item) => item[idKey]);
-    arr.forEach(({ [pIdKey]: parentId, [idKey]: id, ...item }) => {
-      if (!ids.includes(parentId)) {
-        const children = arr2Tree(arr, idKey, pIdKey, id as number | string);
+    // const ids = array.map((item) => item[idKey]);
+    array.forEach(({ [pIdKey]: parentId, [idKey]: id, ...item }) => {
+      const parent = array.find((item2) => item2[pIdKey] === id);
+      // if (!ids.includes(parentId)) { }
+      if (!parent) {
+        const children = arr2TreeRecursion(array, idKey, pIdKey, id as number | string);
         tree.push({ [pIdKey]: parentId, [idKey]: id, ...item, children } as T);
       }
     });
   } else {
-    arr.forEach(({ [pIdKey]: parentId, [idKey]: id, ...item }) => {
+    array.forEach(({ [pIdKey]: parentId, [idKey]: id, ...item }) => {
       if (pId === parentId) {
-        const children = arr2Tree(arr, idKey, pIdKey, id as number | string);
+        const children = arr2TreeRecursion(array, idKey, pIdKey, id as number | string);
         tree.push({ [pIdKey]: parentId, [idKey]: id, ...item, children } as T);
       }
     });
@@ -146,16 +174,29 @@ export function arr2Tree<U, T extends U & { children: T[] }>(
   return tree;
 }
 
-export function arr2Tree2<U, T extends U & { children: T[] }>(
-  arr: U[],
+/**
+ * 查找当前 item 的 paernt , 将其 push 到 paernt.children 中
+ * @param array 
+ * @param idKey 
+ * @param pIdKey 
+ * @returns 
+ */
+function arr2TreeFindParent<U, T extends U & { children: T[] }>(
+  array: U[],
   idKey: keyof U,
   pIdKey: keyof U,
 ): T[] {
-  if (!Array.isArray(arr)) {
+  if (!Array.isArray(array)) {
     return [];
   }
 
-  let tree: T[] = [];
+  // 1. 浅拷贝
+  // 2. 绕过类型错误提示
+  const arr = array.map((item) => {
+    return Object.assign({}, { ...item }, { children: [] }) as unknown as T;
+  });
+
+  const tree: T[] = [];
 
   arr.forEach((item) => {
     if (!item.children) {
@@ -171,6 +212,65 @@ export function arr2Tree2<U, T extends U & { children: T[] }>(
       parent.children.push({ ...item });
     }
   });
+
+  return tree;
+}
+
+/**
+ * 查找当前 item 所有 children , 将 item.children 设置为新的 children
+ * @param array 
+ * @param idKey 
+ * @param pIdKey 
+ * @returns 
+ */
+function arr2TreeFindChildren<U, T extends U & { children: T[] }>(
+  array: U[],
+  idKey: keyof U,
+  pIdKey: keyof U,
+): T[] {
+  if (!Array.isArray(array)) {
+    return [];
+  }
+
+  const arr: T[] = [];
+  const ids: Array<string | number> = [];
+
+  // 1. 浅拷贝
+  // 2. 绕过类型错误提示
+  array.forEach((item) => {
+    const id = item[idKey] as string | number;
+    arr.push(Object.assign({}, { ...item }, { children: [] }) as unknown as T);
+    ids.push(id);
+  });
+
+  return arr.filter((item) => {
+    const children = arr.filter((child) => child[pIdKey] === item[idKey]);
+    item.children = children;
+    const pId = item[pIdKey] as string | number;
+    return !ids.includes(pId);
+  });
+}
+
+export function arr2Tree<U, T extends U & { children: T[] }>(
+  array: U[],
+  idKey: keyof U,
+  pIdKey: keyof U,
+  strategy: 'map' | 'recursion' | 'findParent' | 'findChildren' = 'map'
+): T[] {
+  let tree: T[] = [];
+  switch (strategy) {
+    case 'map':
+      tree = arr2TreeMap(array, idKey, pIdKey)
+      break;
+    case 'recursion':
+      tree = arr2TreeRecursion(array, idKey, pIdKey);
+    case 'findParent':
+      tree = arr2TreeFindParent(array, idKey, pIdKey);
+    case 'findChildren':
+      tree = arr2TreeFindChildren(array, idKey, pIdKey);
+    default:
+      break;
+  }
 
   return tree;
 }
