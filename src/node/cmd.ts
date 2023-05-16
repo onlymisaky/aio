@@ -1,48 +1,77 @@
 import { spawn } from 'child_process';
 
-async function execQuick(command: string, options = { time: true }) {
-  return new Promise((resolve, reject) => {
-    const silent = options.silent !== false;
-    const begin = new Date().getTime();
-    const result = {
-      pid: null,
-      code: null,
-      stdout: '',
-      stderr: '',
-    };
+interface ExecOptions {
+  cwd: string;
+  silent: boolean;
+  time: boolean;
+}
 
-    const { stdout, stderr, pid } = spawn(command, { cwd: options.cwd, shell: true })
-      .on(('close'), (code) => {
-        if (options.time) {
-          const end = new Date().getTime();
-          const waste = ((end - begin) / 1000).toFixed(2);
-          console.info(`Command:【${command}】executed in ${waste} ms.`);
-        }
-        if (code !== 0 && !silent) {
-          console.error(`Command:【${command}】executed failed.`);
-        }
+interface ExecResult {
+  pid: null | string | number,
+  code: null | number,
+  stdout: string[],
+  stderr: string[],
+}
 
-        result.code = code;
-        resolve(result);
-      });
+/**
+ * @param {string} command 
+ * @param {ExecOptions} options 
+ * @returns {Promise<ExecResult>}
+ */
+function execQuick(command, options) {
+  let resolve;
+  const promise = new Promise((res) => { resolve = res; });
 
-    stdout.on('data', (data) => {
-      const dataStr = data.toString();
-      if (!silent) {
-        console.info(dataStr);
+  const { cwd, silent, time } = { cwd: '', silent: false, time: true, ...options, };
+
+  /** @type {string[]} */
+  const stdout = [];
+  /** @type {string[]} */
+  const stderr = [];
+
+  const begin = new Date().getTime();
+
+  const sub = spawn(command, { cwd, shell: true, });
+
+  sub.on('close', (code) => {
+    process.stdin.destroy();
+
+    if (!silent) {
+      const obj = {
+        Command: command,
+        Result: code === 0 ? 'Success' : 'Fail'
       }
-      result.stdout += dataStr;
-    });
-
-    stderr.on('data', (data) => {
-      const dataStr = data.toString();
-      if (!silent) {
-        console.info(dataStr);
+      if (time) {
+        const end = new Date().getTime();
+        const waste = ((end - begin) / 1000).toFixed(2);
+        obj.Time = `${waste}s`;
       }
-      result.stdout += dataStr;
-    });
+      console.table([obj]);
+    }
 
+    resolve({ pid: sub.pid, code, stdout, stderr, })
   });
+
+  sub.stdout.on('data', (data) => {
+    stdout.push(data.toString());
+    if (!silent) {
+      process.stdout.write(data);
+    }
+  });
+
+  sub.stderr.on('data', (data) => {
+    stderr.push(data.toString());
+    if (!silent) {
+      console.log(data.toString());
+    }
+  });
+
+  process.stdin.on('data', (input) => {
+    // https://segmentfault.com/q/1010000017420843
+    sub.stdin.write(input.toString() + '\n\r');
+  });
+
+  return promise;
 }
 
 function stdoutTable2List(stdout: string) {
