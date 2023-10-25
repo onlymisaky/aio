@@ -8,7 +8,11 @@ interface Opt<T> extends OptBase<T> {
   pId: string | number;
 }
 
-function flatTree<T extends Obj>(tree: T[], options?: Partial<Opt<T>>): T[] {
+type TreeItem<Ck extends string = 'children'> = {
+  [P in Ck]?: TreeItem<Ck>[];
+} & Record<string, any>;
+
+function flatTree<Ck extends string, T extends TreeItem<Ck>>(tree: T[], options?: Partial<Opt<T>>): T[] {
   const {
     childrenKey = 'children',
     idKey = 'id',
@@ -65,7 +69,7 @@ export function tree2Arr<T extends { children: T[] }, R = { pId: string } & Omit
   return array;
 }
 
-function findParents<T extends Obj>(
+function findParents<T extends TreeItem>(
   list: T[],
   childId: string | number,
   options?: OptBase<T>
